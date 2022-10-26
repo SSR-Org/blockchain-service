@@ -55,6 +55,12 @@ contract Ride is Ownable {
     
     event Ride_Requested(address rider, uint256 ride_id);
 
+    constructor(uint256 start_ride_id, address new_fare_contract_address) {
+        id = start_ride_id;
+        fare_contract_address = new_fare_contract_address;
+        fare_contract = Fare(new_fare_contract_address);
+    }
+
     modifier _isRiderBusy(address rider) {
         require(!currentRiderStatus(rider), 'Rider is in Ride');
         _;
@@ -152,5 +158,4 @@ contract Ride is Ownable {
     }
 
     //Function to get ride details?
-    
 }
