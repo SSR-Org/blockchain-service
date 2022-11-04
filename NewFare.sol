@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-
 pragma solidity >=0.7.0 <0.9.0;
-
 import 'https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol';
 
 contract Fare is Ownable {
-
     address private ride_contract_address;
 
     struct TAX {

@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-
 pragma solidity >=0.7.0 <0.9.0;
-
 import 'https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol';
 
 interface Fare {
-
     function storeBaseFare(
         uint256 ride_id,
         uint256 distance,
@@ -23,10 +20,20 @@ interface Fare {
 
     function storeEstimatedFare(uint256 ride_id, address driver) external;
 
+    function storeFinalFare(
+        uint256 ride_id,
+        uint256 final_fare,
+        uint256 cgst,
+        uint256 sgst,
+        uint256 rider_referrer_amount,
+        uint256 driver_referrer_amount,
+        uint256 driver_earnings,
+        uint256 base_fare_without_tax,
+        uint256 premium_fare_without_tax
+    ) external;
 }
 
 contract Ride is Ownable {
-    
     uint256 private id;
     address fare_contract_address;
     Fare fare_contract;
@@ -35,7 +42,7 @@ contract Ride is Ownable {
         uint256 ride_id;
         uint256 ride_state; // [0,1,2,6,13]
         // 'new-request': 0,
-        // 'counter-quoted': 1, // 1 will be stored in DB as counter-quoted
+        // 'counter-quoted': 1,
         // 'ride-accepted': 2,
         // 'successfully-completed': 6,
         // 'cancelled-by-rider': 13,
@@ -51,8 +58,7 @@ contract Ride is Ownable {
 
     mapping(address => bool) public is_rider_processing;
     mapping(address => bool) public is_driver_processing;
-    mapping(uint256 => RIDE_DATA) rides;
-    
+    mapping(uint256 => RIDE_DATA) rides; 
     event Ride_Requested(address rider, uint256 ride_id);
 
     constructor(uint256 start_ride_id, address new_fare_contract_address) {
@@ -80,6 +86,20 @@ contract Ride is Ownable {
         require(_msgSender() == rides[ride_id].rider, 'User is not Rider');
         _;
     }
+
+    modifier _isDriver(uint256 ride_id) {
+        require(_msgSender() == rides[ride_id].driver, 'User is not Driver');
+        _;
+    }
+
+    // function setFareContractAddress(address new_fare_contract_address)
+    //     public
+    //     onlyOwner
+    // {
+    //     fare_contract_address = new_fare_contract_address;
+
+    //     fare_contract = Fare(new_fare_contract_address);
+    // }
 
     function currentRiderStatus(address rider) internal view returns (bool) {
         return is_rider_processing[rider];
@@ -137,7 +157,7 @@ contract Ride is Ownable {
         _isRider(ride_id)
     {
         rides[ride_id].driver = driver;
-        fare_contract.storeEstimatedFare(ride_id, driver); //Needed?
+        fare_contract.storeEstimatedFare(ride_id, driver); 
         is_driver_processing[_msgSender()] = true;
         rides[ride_id].ride_state = 2;
     }
@@ -149,6 +169,42 @@ contract Ride is Ownable {
         is_driver_processing[ride_details.driver] = false;
     }
 
+    function endRide(
+        uint256 ride_id,
+        uint256 distance,
+        uint256 time,
+        uint256 final_fare,
+        uint256 cgst,
+        uint256 sgst,
+        uint256 rider_referrer_amount,
+        uint256 driver_referrer_amount,
+        uint256 driver_earnings,
+        uint256 base_fare_without_tax,
+        uint256 premium_fare_without_tax
+    ) public {
+        RIDE_DATA storage ride = rides[ride_id];
+        require(ride.driver == _msgSender(), 'User is not a driver');
+
+        ride.final_time = time;
+        ride.final_distance = distance;
+
+        fare_contract.storeFinalFare(
+            ride_id,
+            final_fare,
+            cgst,
+            sgst,
+            rider_referrer_amount,
+            driver_referrer_amount,
+            driver_earnings,
+            base_fare_without_tax,
+            premium_fare_without_tax
+        );
+        is_rider_processing[ride.rider] = false;
+        is_driver_processing[ride.driver] = false;
+
+        rides[ride_id].ride_state = 6;
+    }
+
     function incrementId() internal {
         id = id + 1;
     }
@@ -157,5 +213,40 @@ contract Ride is Ownable {
         return id;
     }
 
-    //Function to get ride details?
+    function getRideDetails(uint256 _ride_id)
+        public
+        view
+        returns (
+            uint256 ride_id,
+            uint256 ride_state,
+            address rider,
+            address driver,
+            uint256 initial_distance,
+            uint256 initial_time,
+            uint256 final_distance,
+            uint256 final_time,
+            string memory city_code,
+            string memory car_type
+        )
+    {
+        RIDE_DATA memory ride_data = rides[_ride_id];
+        ride_id = ride_data.ride_id;
+        ride_state = ride_data.ride_state;
+        rider = ride_data.rider;
+        driver = ride_data.driver;
+        initial_distance = ride_data.initial_distance;
+        initial_time = ride_data.initial_time;
+        final_distance = ride_data.final_distance;
+        final_time = ride_data.final_time;
+        city_code = ride_data.city_code;
+        car_type = ride_data.car_type;
+    }
+
+    function _getRideState(uint256 ride_id)
+        internal
+        view
+        returns (uint256 ride_state)
+    {
+        ride_state = rides[ride_id].ride_state;
+    }
 }
