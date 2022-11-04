@@ -92,14 +92,14 @@ contract Ride is Ownable {
         _;
     }
 
-    // function setFareContractAddress(address new_fare_contract_address)
-    //     public
-    //     onlyOwner
-    // {
-    //     fare_contract_address = new_fare_contract_address;
+    function setFareContractAddress(address new_fare_contract_address)
+        public
+        onlyOwner
+    {
+        fare_contract_address = new_fare_contract_address;
 
-    //     fare_contract = Fare(new_fare_contract_address);
-    // }
+        fare_contract = Fare(new_fare_contract_address);
+    }
 
     function currentRiderStatus(address rider) internal view returns (bool) {
         return is_rider_processing[rider];

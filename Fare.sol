@@ -513,7 +513,7 @@ contract Fare is Ownable {
     (uint256 cgst_deduction, uint256 sgst_deduction) = taxDeductionAmount(
       split_params.fare_amount,
       split_params.csgt_deduction,
-      split_params.csgt_deduction
+      split_params.sgst_deduction // change in original code too from CGST to SGST
     );
     uint256 fare_without_tax = SafeMath.sub(
       split_params.fare_amount,
