@@ -1,21 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-
 pragma solidity >=0.7.0 <0.9.0;
 
 import 'https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol';
 import 'https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol';
-
-// interface DINR_Token {
-//     struct RIDE_SPLIT_PAY {
-//           address payee;
-//           uint256 amount;
-//      }
-//     function mint(address account, uint256 amount) external;
-//     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-//     function freezeFare(uint256 amount, address beneficiary) external returns (bool) ;
-//     function payAll(address payer, RIDE_SPLIT_PAY[] memory ride_split) external;
-//     function unfreezeFare() external;
-// }
 
 // interface User {
 //     function getUserReferrer(address user) external returns(address);
@@ -28,10 +15,6 @@ contract Fare is Ownable {
         uint256 sgst;
     }
 
-    // struct RIDE_SPLIT_PAY_FARE {
-    //       DINR_Token.RIDE_SPLIT_PAY[] ride_split;
-    //  }
-
     struct CAR_TYPE_PARAMS {
         string car_type_name;
         uint256 minimum_fare;
@@ -42,7 +25,6 @@ contract Fare is Ownable {
     uint256 private referral_percentage;
     address private tax_beneficary;
     address private ride_contract_address;
-    //RIDE_SPLIT_PAY_FARE[] ride_s;
     //mapping (string => CAR_TYPE_PARAMS) public city_car_type_parameters;
 
     struct CITY_PARAMS {
@@ -106,10 +88,14 @@ contract Fare is Ownable {
         address drife;
     }
 
+    struct TOLL {
+        bool is_airport_ride;
+    }
+
     mapping(string => mapping(string => CAR_TYPE_PARAMS)) public city_car_type;
     mapping(string => CITY_PARAMS) public city;
     mapping(uint256 => RIDE_FARE) public ride_fare;
-    //DINR_Token private dinr_token_contract;
+    mapping(uint256 => RIDE_CONTRACT_SPLIT) public rcs;
     //User private user_contract;
 
     event Base_Fare(uint256 ride_id, uint256 fare_amount);
@@ -129,11 +115,31 @@ contract Fare is Ownable {
         uint256 premium_fare_without_tax
     );
 
+
     constructor() {
         referral_percentage = 100;
         tax_beneficary = _msgSender();
-        // dinr_token_contract = DINR_Token(dinr_token_address);
+        TAX memory city_tax = TAX(250, 250);
+        
+        // city_code = "BLR";
+        // CITY_PARAMS storage city_details = city[city_code];
+        CITY_PARAMS storage city_details = city["BLR"];
+        city_details.city_code = "BLR";
+        city_details.minimum_distance = 4000;
+        city_details.distance_buffer = 1000;
+        city_details.time_buffer = 5;
+        city_details.tax_parameters = city_tax;
+        city_details.set_car_parameters = false;
+
+
         // user_contract = User(user_contract_address);
+
+        // CAR_TYPE_PARAMS storage ct = city_car_type["BLR"][car_type_name];
+        // ct.car_type_name = car_type_name;
+        // ct.minimum_fare = minimum_fare;
+        // ct.time_multiplier = time_multiplier;
+        // ct.distance_multiplier = distance_multiplier;
+
     }
 
     modifier _cityExists(string memory city_code) {
@@ -187,7 +193,7 @@ contract Fare is Ownable {
         city_details.time_buffer = time_buffer;
         city_details.tax_parameters = city_tax;
         city_details.set_car_parameters = false;
-        //city[city_code] = CITY_PARAMS(city_code, minimium_distance, distance_buffer, time_buffer, city_tax);
+        // city[city_code] = CITY_PARAMS(city_code, minimium_distance, distance_buffer, time_buffer, city_tax);
     }
 
     function setCityCarTyeParameters(
@@ -371,6 +377,65 @@ contract Fare is Ownable {
         emit Estimated_Fare(ride_id, estimated_fare);
     }
 
+
+
+    //toll
+    function tollFare(
+        bool is_airport_ride
+    ) public returns (uint256 tollValue) {
+        if (is_airport_ride) {
+            tollValue = 10500;
+        }
+
+        return tollValue;
+    }
+
+
+    // function discount(
+    //     string discountType,
+    //     uint256 calculatedFare,
+    //     uint256 X,
+    //     uint256 Y
+    // ) returns (uint256 discountedFare) {
+
+    //     if (discountType == "flat") {
+    //         discountedFare = X > calculatedFare ? 0 : calculatedFare - X;
+    //     } 
+
+    //     if (discountType == "percentage") {
+
+    //     }
+    // }
+
+    function flatDiscount(
+        uint256 calculatedFare,
+        uint256 flatDiscountValue
+    ) public returns (uint256 discountedFare) {
+
+        discountedFare = flatDiscountValue > calculatedFare ? 0 : calculatedFare - flatDiscountValue;
+        return discountedFare;
+    }
+
+    function percentageDiscount(
+        uint256 calculatedFare,
+        uint256 percentageDiscountValue,
+        uint256 discountUpto
+    ) public returns (uint256 discountedFare) {
+
+        uint256 discount = (calculatedFare * percentageDiscountValue)/uint(10000);
+
+        if (discount >= discountUpto) {
+            discountedFare = calculatedFare - discountUpto;
+        } else {
+            discountedFare = calculatedFare - discount;
+        }
+
+        return discountedFare;
+
+    }
+
+
+
     function storeFinalFare(
         uint256 ride_id,
         uint256 final_fare,
@@ -380,10 +445,14 @@ contract Fare is Ownable {
         uint256 driver_referrer_amount,
         uint256 driver_earnings,
         uint256 base_fare_without_tax,
-        uint256 premium_fare_without_tax
+        uint256 premium_fare_without_tax,
+        string memory city_code
     ) external _isRideContract {
         // TODO: Add check id we need to recalculate final fare
-        //CITY_PARAMS memory city_params = city[rcs.city_code];
+        // RIDE_CONTRACT_SPLIT memory ride_contact_split = rcs[city_code];
+
+        // CITY_PARAMS memory city_params = city[rcs.city_code];
+        CITY_PARAMS memory city_params = city[city_code];
 
         ride_fare[ride_id].fare_split_details = FARE_SPLIT(
         cgst,
@@ -395,47 +464,52 @@ contract Fare is Ownable {
         premium_fare_without_tax
         );
 
-        // bool buffer_check = absDifference(rcs.final_distance, rcs.initial_distance) <
-        //   city_params.distance_buffer &&
-        //   (
-        //     SafeMath.div(
-        //       SafeMath.mul(100, absDifference(rcs.initial_time, rcs.final_time)),
-        //       rcs.initial_time
-        //     )
-        //   ) <
-        //   city_params.time_buffer;
-        // if (buffer_check) {
-        //   final_fare = ride_fare[ride_id].estimated_fare;
-        //   ride_fare[ride_id].final_fare = final_fare;
-        // } else {
 
-        //   uint256 new_base_fare = baseFareCalculation(
-        //       rcs.city_code,
-        //       rcs.car_type,
-        //       rcs.final_time,
-        //       rcs.final_distance
-        //     );
-        //   final_fare = calculateEstimatedFare(
-        //     new_base_fare,
-        //     ride_fare[ride_id].chosen_mileage
-        //   );
-        //   ride_fare[ride_id].final_fare = final_fare;
-        // }
-        // ride_fare[ride_id].buffer_check = buffer_check;
-        // splitRideFare(ride_id, rcs.city_code);
+        //BUFFER CHECK
+        bool buffer_check = absDifference(rcs.final_distance, rcs.initial_distance) <
+          city_params.distance_buffer &&
+          (
+            SafeMath.div(
+              SafeMath.mul(100, absDifference(rcs.initial_time, rcs.final_time)),
+              rcs.initial_time
+            )
+          ) <
+          city_params.time_buffer;
+        if (buffer_check) {
+          final_fare = ride_fare[ride_id].estimated_fare;
+          ride_fare[ride_id].final_fare = final_fare;
+        } else {
+
+          uint256 new_base_fare = baseFareCalculation(
+              rcs.city_code,
+              rcs.car_type,
+              rcs.final_time,
+              rcs.final_distance
+            );
+          final_fare = calculateEstimatedFare(
+            new_base_fare,
+            ride_fare[ride_id].chosen_mileage
+          );
+          ride_fare[ride_id].final_fare = final_fare;
+        }
+        ride_fare[ride_id].buffer_check = buffer_check;
+        splitRideFare(ride_id, rcs.city_code);
         // disburseFare(ride_id, driver, rider);
+
+
+
         ride_fare[ride_id].final_fare = final_fare;
         emit Final_Fare(ride_id, final_fare);
-        emit Fare_Split_Details(
-        ride_id,
-        cgst,
-        sgst,
-        driver_referrer_amount,
-        rider_referrer_amount,
-        driver_earnings,
-        base_fare_without_tax,
-        premium_fare_without_tax
-        );
+        // emit Fare_Split_Details(
+        // ride_id,
+        // cgst,
+        // sgst,
+        // driver_referrer_amount,
+        // rider_referrer_amount,
+        // driver_earnings,
+        // base_fare_without_tax,
+        // premium_fare_without_tax
+        // );
     }
 
     function splitRideFare(uint256 ride_id, string memory city_code)
