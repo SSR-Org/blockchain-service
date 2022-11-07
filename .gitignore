@@ -1,1 +1,6 @@
+.gitignore
+.gitattributes
 discount.js
+Fare.sol
+Ride.sol
+NewFareModif.sol

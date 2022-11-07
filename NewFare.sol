@@ -45,12 +45,18 @@ contract Fare is Ownable {
         uint256 ride_id;
         uint256 base_fare;
         uint256 boost_percent;
-        uint256 chosen_mileage;
+        uint256 chosen_mileage; 
         uint256 estimated_fare;
         uint256 final_fare;
         mapping(address => DRIVER_COUNTER_QUOTE) counter_quotes;
         FARE_SPLIT fare_split_details;
-        // bool buffer_check;
+        EXTRA_CHARGES  extra_charge_details;
+    }
+
+    struct EXTRA_CHARGES {
+        uint256 toll_amount;
+        uint256 discount_amount;
+        uint256 other_charges;
     }
 
     mapping(string => mapping(string => CAR_TYPE_PARAMS)) public city_car_type;
@@ -147,7 +153,7 @@ contract Fare is Ownable {
         CITY_PARAMS memory city_params = city[city_code];
         CAR_TYPE_PARAMS memory car_params = city_car_type[city_code][car_type];
         TAX memory tax_details = city_params.tax_parameters;
-        
+
         uint256 distance_to_multiply = distance - city_params.minimum_distance;
         uint256 fare_before_tax = car_params.minimum_fare +
         (car_params.time_multiplier * time) +
@@ -178,19 +184,23 @@ contract Fare is Ownable {
         uint256 time,
         uint256 boost_percent,
         string memory city_code,
-        string memory car_type
+        string memory car_type,
+        uint256 toll_amount,
+        uint256 discount_amount,
+        uint256 other_charges
+        
     ) external _isRideContract _cityExists(city_code) { 
         RIDE_FARE storage new_ride_fare = ride_fare[ride_id];
         new_ride_fare.ride_id = ride_id;
         uint256 base_fare = baseFareCalculation(
-        city_code,
-        car_type,
-        time,
-        distance
+            city_code,
+            car_type,
+            time,
+            distance
         );
 
-        new_ride_fare.base_fare = calculateEstimatedFare(base_fare, boost_percent); // boost_precentage as mileage???
-
+        new_ride_fare.base_fare = calculateEstimatedFare(base_fare, boost_percent);
+        new_ride_fare.base_fare = new_ride_fare.base_fare + toll_amount - discount_amount + other_charges;
         emit Base_Fare(ride_id, base_fare);
     }
 
@@ -230,7 +240,12 @@ contract Fare is Ownable {
         uint256 driver_referrer_amount,
         uint256 driver_earnings,
         uint256 base_fare_without_tax,
-        uint256 premium_fare_without_tax
+        uint256 premium_fare_without_tax,
+        EXTRA_CHARGES memory extra_charge_details
+        // 16 local variable constraint in a function.
+        // uint256 toll_amount,
+        // uint256 discount_amount,
+        // uint256 other_charges
     ) external _isRideContract {
         ride_fare[ride_id].fare_split_details = FARE_SPLIT(
             cgst,
@@ -241,6 +256,7 @@ contract Fare is Ownable {
             base_fare_without_tax,
             premium_fare_without_tax
         );
+        final_fare = final_fare + extra_charge_details.toll_amount - extra_charge_details.discount_amount + extra_charge_details.other_charges;
         ride_fare[ride_id].final_fare = final_fare;
         emit Final_Fare(ride_id, final_fare);
         emit Fare_Split_Details(

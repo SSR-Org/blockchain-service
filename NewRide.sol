@@ -9,7 +9,10 @@ interface Fare {
         uint256 time,
         uint256 boost_percent,
         string memory city_code,
-        string memory car_type
+        string memory car_type,
+        uint256 toll_amount,
+        uint256 discount_amount,
+        uint256 other_charges
     ) external;
 
     function addCounterQuote(
@@ -54,6 +57,12 @@ contract Ride is Ownable {
         uint256 final_time;
         string city_code;
         string car_type;
+    }
+
+    struct EXTRA_CHARGES {
+        uint256 toll_amount;
+        uint256 discount_amount;
+        uint256 other_charges;
     }
 
     mapping(address => bool) public is_rider_processing;
@@ -114,7 +123,11 @@ contract Ride is Ownable {
         uint256 initial_time,
         string memory city_code,
         string memory car_type,
-        uint256 boost_percent
+        uint256 boost_percent,
+        EXTRA_CHARGES memory extra_charge_details
+        // uint256 toll_amount,
+        // uint256 discount_amount,
+        // uint256 other_charges
     ) public _isRiderBusy(msg.sender) returns (uint256) {
         uint256 current_id = getId();
         uint256 new_ride_id = current_id + 1;
@@ -134,7 +147,10 @@ contract Ride is Ownable {
             initial_time,
             boost_percent,
             city_code,
-            car_type
+            car_type,
+            extra_charge_details.toll_amount,
+            extra_charge_details.discount_amount,
+            extra_charge_details.other_charges
         );
         incrementId();
 
